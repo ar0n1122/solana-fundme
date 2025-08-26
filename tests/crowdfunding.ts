@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { SystemProgram } from "@solana/web3.js";
+import { SolanaJSONRPCError, SystemProgram } from "@solana/web3.js";
 import { assert } from "chai";
 import { Crowdfunding } from "../target/types/crowdfunding";
 import { BN } from "bn.js";
@@ -57,6 +57,52 @@ describe("crowdfunding", () => {
     const finalBalance = await provider.connection.getBalance(
       provider.wallet.publicKey
     );
-    console.log("Balance before:", initialBalance, "after:", finalBalance);
+    //console.log("Balance before:", initialBalance, "after:", finalBalance);
+  });
+
+  it("withdraw Funds", async () => {
+    // first donated 5 sol
+    await program.methods
+      .donate(new anchor.BN(5_000_000_000)) // 5 SOL
+      .accounts({
+        campaign: campaignAccount.publicKey,
+        user: provider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    const fundMeBalanceBefore = await provider.connection.getBalance(
+      campaignAccount.publicKey
+    );
+
+    const userBefore = await provider.connection.getBalance(
+      provider.wallet.publicKey
+    );
+
+    await program.methods
+      .withdraw(new anchor.BN(1_000_000_000))
+      .accounts({
+        campaign: campaignAccount.publicKey,
+        user: provider.wallet.publicKey,
+      })
+      //.signers([campaignAccount]) //no signer needed, by default povider.wallet will sign
+      .rpc();
+
+    const account = await program.account.campaign.fetch(
+      campaignAccount.publicKey
+    );
+    const fundMeBalanceAfter = await provider.connection.getBalance(
+      campaignAccount.publicKey
+    );
+
+    const userAfter = await provider.connection.getBalance(
+      provider.wallet.publicKey
+    );
+    console.log("before", fundMeBalanceBefore);
+    console.log("after", fundMeBalanceAfter);
+    console.log("before", userBefore);
+    console.log("before", userAfter);
+    assert(fundMeBalanceBefore - fundMeBalanceAfter == 1_000_000_000);
+    assert(userBefore < userAfter);
   });
 });
